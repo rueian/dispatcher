@@ -71,7 +71,7 @@ func (q *QosSource) Start(fn func()) {
 			}
 		}
 	}()
-	q.fetch <- int(q.ring.size)
+	q.fetch <- len(q.ring.store)
 }
 
 func NewQosSource(size, rate uint64, store Persistence) *QosSource {
