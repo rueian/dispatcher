@@ -27,8 +27,11 @@ type event struct {
 }
 
 type Dispatcher struct {
+	_      [8]uint64
+	nextID uint64
+	_      [7]uint64
+
 	consumers map[uint64]*Consumer
-	nextID    uint64
 	quota     int64
 
 	source Source

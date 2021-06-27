@@ -6,8 +6,11 @@ import (
 )
 
 type qos struct {
+	_     [8]uint64
 	rate  uint64 // per second
+	_     [7]uint64
 	quota uint64
+	_     [7]uint64
 }
 
 func (q *qos) start(fn func()) {

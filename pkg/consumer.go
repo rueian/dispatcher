@@ -24,7 +24,9 @@ type Consumer struct {
 
 	mu      sync.Mutex
 	pending map[uint64]Message
+	_       [8]uint64
 	count   int64
+	_       [7]uint64
 }
 
 func (c *Consumer) Pending() (count int64) {

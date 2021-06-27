@@ -6,14 +6,14 @@ import (
 )
 
 type ring struct {
-	_padding0 [8]uint64
-	tail      uint64
-	_padding1 [8]uint64
-	head      uint64
-	_padding2 [8]uint64
-	mask      uint64
-	_padding3 [8]uint64
-	store     []Message
+	_     [8]uint64
+	tail  uint64
+	_     [7]uint64
+	head  uint64
+	_     [7]uint64
+	mask  uint64
+	_     [7]uint64
+	store []Message
 }
 
 func (r *ring) Put(m Message) {

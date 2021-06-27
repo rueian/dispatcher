@@ -29,8 +29,11 @@ type LogPersistence struct {
 	writes     chan write
 
 	mid   uint64
+	_     [8]uint64
 	acks  uint64
+	_     [7]uint64
 	sents uint64
+	_     [7]uint64
 }
 
 func (l *LogPersistence) ReadNext() (Message, error) {
