@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"errors"
-	"sync"
 	"sync/atomic"
 )
 
@@ -15,7 +14,7 @@ func newConsumer(id uint64, dispatcher *Dispatcher, onReceived ReceiveHandler, s
 		id:         id,
 		dispatcher: dispatcher,
 		onReceived: onReceived,
-		pending:    make(map[uint64]Message, size),
+		msgs:       newRing(uint64(size)),
 	}
 }
 
@@ -24,11 +23,14 @@ type Consumer struct {
 	dispatcher *Dispatcher
 	onReceived ReceiveHandler
 
-	mu      sync.Mutex
-	pending map[uint64]Message
-	_       [8]uint64
-	count   int64
-	_       [7]uint64
+	msgs ring
+	acks Heap
+
+	_     [8]uint64
+	count int64
+	_     [7]uint64
+	state int64
+	_     [7]uint64
 }
 
 func (c *Consumer) Pending() (count int64) {
@@ -36,43 +38,57 @@ func (c *Consumer) Pending() (count int64) {
 }
 
 func (c *Consumer) push(msg Message) error {
-	c.mu.Lock()
-	if c.dispatcher == nil {
-		c.mu.Unlock()
+	if atomic.LoadInt64(&c.state) != 0 {
 		return ErrConsumerUnregistered
 	}
-	c.pending[msg.ID()] = msg
-	c.mu.Unlock()
 	atomic.AddInt64(&c.count, 1)
+	c.msgs.Put(msg)
 	return c.onReceived(msg)
 }
 
 func (c *Consumer) Ack(msg Message, requeue bool) {
-	c.mu.Lock()
-	if c.dispatcher == nil {
-		c.mu.Unlock()
+	if atomic.LoadInt64(&c.state) != 0 {
 		return
 	}
-	delete(c.pending, msg.ID())
-	c.mu.Unlock()
-	atomic.AddInt64(&c.count, -1)
+	c.acks.Push(msg.ID())
+	for {
+		ack, _ := c.acks.Peek()
+		msg, ok := c.msgs.Peak()
+		if !ok {
+			panic("consumer ring is broken")
+		}
+		if msg.ID() == ack {
+			c.acks.Pop()
+			c.msgs.Next()
+			atomic.AddInt64(&c.count, -1)
+		} else {
+			break
+		}
+	}
 	c.dispatcher.ack(c, requeue, msg)
 }
 
 func (c *Consumer) Unregister() {
-	c.mu.Lock()
-	if c.dispatcher == nil {
-		c.mu.Unlock()
+	if !atomic.CompareAndSwapInt64(&c.state, 0, 1) {
 		return
 	}
-	broker := c.dispatcher
-	pending := c.pending
-	c.pending = nil
-	c.dispatcher = nil
-	c.mu.Unlock()
-	broker.unregister(c)
-	for _, m := range pending {
-		broker.ack(c, true, m)
+	c.dispatcher.unregister(c)
+
+	acks := make(map[uint64]bool, c.acks.Len())
+	for {
+		ack, ok := c.acks.Pop()
+		if !ok {
+			break
+		}
+		acks[ack] = true
 	}
-	atomic.StoreInt64(&c.count, 0)
+	for {
+		msg, ok := c.msgs.Next()
+		if !ok {
+			break
+		}
+		if !acks[msg.ID()] {
+			c.dispatcher.ack(nil, true, msg)
+		}
+	}
 }

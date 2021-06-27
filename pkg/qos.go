@@ -37,8 +37,8 @@ func (q *qos) Consumable() bool {
 }
 
 type QosSource struct {
-	qos   *qos
-	ring  *ring
+	qos   qos
+	ring  ring
 	store Persistence
 	fetch chan int
 }
@@ -79,7 +79,7 @@ func (q *QosSource) Start(fn func()) {
 
 func NewQosSource(size, rate uint64, store Persistence) *QosSource {
 	return &QosSource{
-		qos: &qos{
+		qos: qos{
 			rate: rate,
 		},
 		ring:  newRing(size),

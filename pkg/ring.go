@@ -34,9 +34,18 @@ func (r *ring) Next() (Message, bool) {
 	}
 }
 
-func newRing(size uint64) *ring {
+func (r *ring) Peak() (Message, bool) {
+	read := atomic.LoadUint64(&r.tail)
+	next := read + 1
+	if next > atomic.LoadUint64(&r.head) {
+		return nil, false
+	}
+	return r.store[next&r.mask], true
+}
+
+func newRing(size uint64) ring {
 	size = roundUp(size)
-	return &ring{mask: size - 1, store: make([]Message, size)}
+	return ring{mask: size - 1, store: make([]Message, size)}
 }
 
 // roundUp takes a uint64 greater than 0 and rounds it up to the next
