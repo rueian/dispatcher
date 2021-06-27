@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -12,47 +13,15 @@ type Source interface {
 	Start(func())
 }
 
-type eventType int
-
-const (
-	register eventType = iota
-	unregister
-	dispatch
-)
-
-type event struct {
-	typ      eventType
-	consumer *Consumer
-}
-
 type Dispatcher struct {
 	_      [8]uint64
 	nextID uint64
 	_      [7]uint64
 
-	consumers map[uint64]*Consumer
+	consumers sync.Map
 	quota     int64
 
 	source Source
-	events chan event
-}
-
-func (b *Dispatcher) Dispatch() {
-	for e := range b.events {
-		switch e.typ {
-		case register:
-			b.consumers[e.consumer.id] = e.consumer
-			b.dispatch(e.consumer)
-		case unregister:
-			delete(b.consumers, e.consumer.id)
-		case dispatch:
-			for _, consumer := range b.consumers {
-				if more := b.dispatch(consumer); !more {
-					break
-				}
-			}
-		}
-	}
 }
 
 func (b *Dispatcher) dispatch(consumer *Consumer) (more bool) {
@@ -62,8 +31,11 @@ func (b *Dispatcher) dispatch(consumer *Consumer) (more bool) {
 			return false
 		}
 		if err := consumer.push(msg); err != nil {
-			b.source.OnNack(msg)
-			consumer.Unregister()
+			if err == ErrConsumerUnregistered {
+				b.source.OnNack(msg)
+			} else {
+				consumer.Unregister()
+			}
 			return true
 		}
 	}
@@ -73,12 +45,13 @@ func (b *Dispatcher) dispatch(consumer *Consumer) (more bool) {
 func (b *Dispatcher) Register(cb ReceiveHandler) (consumer *Consumer) {
 	id := atomic.AddUint64(&b.nextID, 1)
 	consumer = newConsumer(id, b, cb, int(b.quota))
-	b.events <- event{typ: register, consumer: consumer}
+	b.consumers.Store(id, consumer)
+	b.dispatch(consumer)
 	return consumer
 }
 
 func (b *Dispatcher) unregister(consumer *Consumer) {
-	b.events <- event{typ: unregister, consumer: consumer}
+	b.consumers.Delete(consumer.id)
 }
 
 func (b *Dispatcher) ack(consumer *Consumer, requeue bool, msg Message) {
@@ -90,15 +63,15 @@ func (b *Dispatcher) ack(consumer *Consumer, requeue bool, msg Message) {
 	b.dispatch(consumer)
 }
 
-func NewDispatcher(size, quota int64, source Source) *Dispatcher {
+func NewDispatcher(quota int64, source Source) *Dispatcher {
 	b := &Dispatcher{
-		consumers: make(map[uint64]*Consumer),
-		quota:     quota,
-		source:    source,
-		events:    make(chan event, size),
+		quota:  quota,
+		source: source,
 	}
 	b.source.Start(func() {
-		b.events <- event{typ: dispatch}
+		b.consumers.Range(func(_, consumer interface{}) bool {
+			return b.dispatch(consumer.(*Consumer))
+		})
 	})
 	return b
 }

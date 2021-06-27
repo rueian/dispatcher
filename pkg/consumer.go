@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 )
 
+var ErrConsumerUnregistered = errors.New("consumer unregistered")
+
 type ReceiveHandler func(msg Message) error
 
 func newConsumer(id uint64, dispatcher *Dispatcher, onReceived ReceiveHandler, size int) *Consumer {
@@ -37,7 +39,7 @@ func (c *Consumer) push(msg Message) error {
 	c.mu.Lock()
 	if c.dispatcher == nil {
 		c.mu.Unlock()
-		return errors.New("consumer unregistered")
+		return ErrConsumerUnregistered
 	}
 	c.pending[msg.ID()] = msg
 	c.mu.Unlock()
