@@ -20,6 +20,12 @@ func (h *minHeap) Pop() interface{} {
 	return x
 }
 
+func newHeap(size int) Heap {
+	h := Heap{min: make([]uint64, 0, size)}
+	heap.Init(&h.min)
+	return h
+}
+
 type Heap struct {
 	min minHeap
 }

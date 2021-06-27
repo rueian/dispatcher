@@ -15,6 +15,7 @@ func newConsumer(id uint64, dispatcher *Dispatcher, onReceived ReceiveHandler, s
 		dispatcher: dispatcher,
 		onReceived: onReceived,
 		msgs:       newRing(uint64(size)),
+		acks:       newHeap(size),
 	}
 }
 

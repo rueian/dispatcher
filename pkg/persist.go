@@ -82,7 +82,7 @@ func (l *LogPersistence) Stats() uint64 {
 
 func NewLogPersistence(size int) *LogPersistence {
 	p := &LogPersistence{
-		confirmed: Heap{min: make([]uint64, 0, size)},
+		confirmed: newHeap(size),
 		writes:    make(chan write, size),
 	}
 	go p.start()
