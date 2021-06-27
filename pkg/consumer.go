@@ -51,17 +51,26 @@ func (c *Consumer) Ack(msg Message, requeue bool) {
 	if atomic.LoadInt64(&c.state) != 0 {
 		return
 	}
+
+	pending, ok := c.msgs.Peak()
+	if !ok {
+		panic("consumer ring should not be empty")
+	}
+
+	if pending.ID() == msg.ID() {
+		c.msgs.Next()
+		atomic.AddInt64(&c.count, -1)
+		c.dispatcher.ack(c, requeue, msg)
+		return
+	}
+
 	c.acks.Push(msg.ID())
-	for {
-		ack, _ := c.acks.Peek()
-		msg, ok := c.msgs.Peak()
-		if !ok {
-			panic("consumer ring is broken")
-		}
-		if msg.ID() == ack {
+	for ok {
+		if ack, more := c.acks.Peek(); more && pending.ID() == ack {
 			c.acks.Pop()
 			c.msgs.Next()
 			atomic.AddInt64(&c.count, -1)
+			pending, ok = c.msgs.Peak()
 		} else {
 			break
 		}

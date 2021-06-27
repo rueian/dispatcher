@@ -53,6 +53,12 @@ func (l *LogPersistence) start() {
 	for w := range l.writes {
 		switch w.writeType {
 		case writeAck:
+			if w.message.ID() == l.checkpoint+1 {
+				l.checkpoint++
+				atomic.AddUint64(&l.acks, 1)
+				continue
+			}
+
 			l.confirmed.Push(w.message.ID())
 			for {
 				minAck, ok := l.confirmed.Peek()
