@@ -11,6 +11,7 @@ type Source interface {
 	OnNack(Message)
 	OnSent(Message)
 	Start(func())
+	Size() int
 }
 
 type Dispatcher struct {

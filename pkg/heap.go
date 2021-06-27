@@ -49,3 +49,7 @@ func (h *Heap) Peek() (uint64, bool) {
 func (h *Heap) Len() int {
 	return len(h.min)
 }
+
+func (h *Heap) Cap() int {
+	return cap(h.min)
+}

@@ -21,6 +21,7 @@ type Persistence interface {
 	WriteAck(Message)
 	WriteSent(Message)
 	Close() error
+	Size() int
 }
 
 type LogPersistence struct {
@@ -84,6 +85,10 @@ func (l *LogPersistence) Close() error {
 
 func (l *LogPersistence) Stats() uint64 {
 	return atomic.LoadUint64(&l.acks)
+}
+
+func (l *LogPersistence) Size() int {
+	return l.confirmed.Cap()
 }
 
 func NewLogPersistence(size int) *LogPersistence {

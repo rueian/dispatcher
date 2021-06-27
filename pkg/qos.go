@@ -63,6 +63,10 @@ func (q *QosSource) OnSent(message Message) {
 	q.store.WriteSent(message)
 }
 
+func (q *QosSource) Size() int {
+	return q.store.Size()
+}
+
 func (q *QosSource) Start(fn func()) {
 	go q.qos.start(fn)
 	go func() {
@@ -77,13 +81,13 @@ func (q *QosSource) Start(fn func()) {
 	q.fetch <- len(q.ring.store)
 }
 
-func NewQosSource(size, rate uint64, store Persistence) *QosSource {
+func NewQosSource(rate uint64, store Persistence) *QosSource {
 	return &QosSource{
 		qos: qos{
 			rate: rate,
 		},
-		ring:  newRing(size),
 		store: store,
-		fetch: make(chan int, size),
+		fetch: make(chan int, store.Size()),
+		ring:  newRing(uint64(store.Size())),
 	}
 }
