@@ -18,7 +18,6 @@ const (
 	register eventType = iota
 	unregister
 	dispatch
-	ack
 )
 
 type event struct {
@@ -46,8 +45,6 @@ func (b *Dispatcher) Dispatch() {
 			b.dispatch(e.consumer)
 		case unregister:
 			delete(b.consumers, e.consumer.id)
-		case ack:
-			b.dispatch(e.consumer)
 		case dispatch:
 			for _, consumer := range b.consumers {
 				if more := b.dispatch(consumer); !more {
@@ -58,15 +55,15 @@ func (b *Dispatcher) Dispatch() {
 	}
 }
 
-func (b *Dispatcher) dispatch(client *Consumer) (more bool) {
-	for i := b.quota - client.Pending(); i > 0; i-- {
+func (b *Dispatcher) dispatch(consumer *Consumer) (more bool) {
+	for i := b.quota - consumer.Pending(); i > 0; i-- {
 		msg, ok := b.source.Next()
 		if !ok {
 			return false
 		}
-		if err := client.push(msg); err != nil {
-			delete(b.consumers, client.id)
-			client.Unregister()
+		if err := consumer.push(msg); err != nil {
+			b.source.OnNack(msg)
+			consumer.Unregister()
 			return true
 		}
 	}
@@ -90,7 +87,7 @@ func (b *Dispatcher) ack(consumer *Consumer, requeue bool, msg Message) {
 		return
 	}
 	b.source.OnAck(msg)
-	b.events <- event{typ: ack, consumer: consumer}
+	b.dispatch(consumer)
 }
 
 func NewDispatcher(size, quota int64, source Source) *Dispatcher {
