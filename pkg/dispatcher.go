@@ -58,9 +58,9 @@ func (b *Dispatcher) unregister(consumer *Consumer) {
 func (b *Dispatcher) ack(consumer *Consumer, requeue bool, msg Message) {
 	if requeue {
 		b.source.OnNack(msg)
-		return
+	} else {
+		b.source.OnAck(msg)
 	}
-	b.source.OnAck(msg)
 	b.dispatch(consumer)
 }
 
