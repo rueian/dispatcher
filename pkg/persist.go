@@ -43,10 +43,12 @@ func (l *LogPersistence) ReadNext() (Message, error) {
 }
 
 func (l *LogPersistence) WriteAck(message Message) {
+	// TODO: find out when to close l.writes
 	l.writes <- write{writeType: writeAck, message: message}
 }
 
 func (l *LogPersistence) WriteSent(message Message) {
+	// TODO: find out when to close l.writes
 	l.writes <- write{writeType: writeSent, message: message}
 }
 
